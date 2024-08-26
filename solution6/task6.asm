@@ -131,6 +131,7 @@ scanf:
     int 0x80
 
     xor eax, eax
+    xor edi, edi
     mov esi, buffer_write
     mov dl, [esi]
     test dl, dl
@@ -154,6 +155,7 @@ scanf:
     _done:
         test edi, edi
         jnz _negate
+        xor esi, esi
         ret
 
     _negate:

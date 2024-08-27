@@ -1,5 +1,5 @@
 section .data
-    array dd 123123,1,-2,2,-1543,123,12,-2314,123,1234213,-4123,1234
+    array dd 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32,-1, -2, -3, -4, -5, -6, -7, -8, -9, -10, -11, -12, -13, -14, -15, -16, -17, -18, -19, -20, -21, -22, -23, -24, -25, -26, -27, -28, -29, -30, -31, -32
     array_length equ ($ - array) / 4
     minmax_str db "Max - 1, Min - 2: ", 0
     minmax_str_len equ $ - minmax_str
@@ -44,9 +44,6 @@ _findmax:
 exit:    
     mov [result], eax
     call printf
-
-    mov esi, array
-    mov ecx, array_length - 1
 
     mov eax, 1
     mov ebx, 0

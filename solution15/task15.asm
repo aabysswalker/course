@@ -41,9 +41,7 @@ _start:
     mov edx, 2
     int 0x80
 
-    mov al, [key]
-    sub al, '0'
-    mov [key], al
+    sub byte [key], '0'
 
     PRINTM input_path, input_path_l
     mov eax, 3
@@ -104,6 +102,7 @@ _leave:
     ret
 
 crypt:
+    prefetchnta [esi]
     mov edx, ecx
     shr edx, 2
     jz crypt_tail
@@ -140,7 +139,7 @@ _done_crypt:
 read_file:
     mov eax, 5
     mov ebx, input_file
-    mov ecx, 0
+    xor ecx, ecx
     int 0x80
 
     test eax, eax

@@ -1,86 +1,148 @@
+%macro PRINTM 2
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, %1
+    mov edx, %2
+    int 0x80
+%endmacro
+
 section .data
-    key db 90
-    encr db 'solution15/input', 0
-    decr db 'solution15/output', 0
-    mode db 'Mode? (e - encrypt, d - decrypt) ', 0
-    mode_l equ $ - mode
+    key_s db "Enter key: ", 0
+    key_l equ $ - key_s 
+    input_path db 'Enter encryption filepath: ', 0
+    input_path_l equ $ - input_path
+    output_path db 'Enter decryption filepath: ', 0
+    output_path_l equ $ - output_path
+    state db 'Success', 0x0A
+    debug_err db 'File not defined', 0x0A
+    debug_l equ $ - debug_err
     file_descriptor dd 0
+    file_size db 0
+    zero_buffer db 1024 dup(0)
 
 section .bss
-    buffer resb 256
-    input resb 256
-    buffer_write resb 256
-    buffer_read resb 256
+    key resb 2
+    input_file resb 32
+    output_file resb 32
+    buffer_write resb 1
+    input_buffer resb 1
+    result_array    resd 1
+    result_array_size resd 1
+    old_array_size resd 1
+
 
 section .text
     global _start
 
-_start:    
-    mov eax, 4
-    mov ebx, 1
-    mov ecx, mode
-    mov edx, mode_l
+_start:
+    PRINTM key_s, key_l
+    mov eax, 3
+    mov ebx, 2
+    mov ecx, key
+    mov edx, 2
     int 0x80
 
-    call scanf
-    mov al, [buffer_write]
-    cmp al, 'd'
-    je exit 
+    mov al, [key]
+    sub al, '0'
+    mov [key], al
+    PRINTM input_path, input_path_l
+    ;solution15/input
+    mov eax, 3
+    mov ebx, 2
+    mov ecx, input_file
+    mov edx, 32
+    int 0x80
+    
+    mov byte [input_file + eax - 1], 0
+
+    PRINTM output_path, output_path_l
+    mov eax, 3
+    mov ebx, 2
+    mov ecx, output_file
+    mov edx, 32
+    int 0x80
+    mov byte [output_file + eax - 1], 0
 
     call read_file
-    mov esi, buffer_read
-    mov edi, buffer
+    mov esi, input_buffer
+    mov edi, input_buffer
     mov ecx, 256
-    call encrypt
+    call crypt
     call write_file
 
-
-    mov esi, buffer
+    mov esi, input_buffer
     mov edi, buffer_write
     mov ecx, 256
-    call decrypt
-
+    call crypt
+    
 exit:
-
+    PRINTM state, 8
     mov eax, 1
     xor ebx, ebx
     int 0x80
 
-encrypt:
-    encrypt_loop:
+print_array:
+    mov esi, [result_array]
+    mov ecx, [result_array_size]
+    
+    _print_loop:
+        test ecx, ecx
+        jz _leave
+        
+        mov eax, [esi]
+        
+        push ecx
+        push esi
+        call printf
+        pop esi
+        pop ecx
+
+        add esi, 4
+        dec ecx
+        jmp _print_loop
+
+        _leave:
+            ret
+
+crypt:
+    crypt_loop:
         lodsb
         test al, al
-        jz _done_encryption
+        jz _done_crypt
         xor al, [key]
         stosb
-        loop encrypt_loop
-
-    _done_encryption:
-        ret
-
-decrypt:
-    decrypt_loop:
-        lodsb
-        test al, al
-        jz _done_decryption
-        xor al, [key]
-        stosb
-        loop decrypt_loop
-
-    _done_decryption:
+        loop crypt_loop
+    _done_crypt:
         ret
 
 read_file:
     mov eax, 5
-    mov ebx, encr
+    mov ebx, input_file
     mov ecx, 0
     int 0x80
+
+    test eax, eax
+    js open_error
+
     mov [file_descriptor], eax
+
+    mov eax, 19
+    mov ebx, [file_descriptor]
+    xor ecx, ecx
+    mov edx, 2
+    int 0x80
+    mov [file_size], eax
+
+    mov eax, 19
+    mov ebx, [file_descriptor]
+    xor ecx, ecx
+    xor edx, edx
+    int 0x80
 
     mov eax, 3
     mov ebx, [file_descriptor]
-    mov ecx, buffer_read
-    mov edx, 16
+    mov ecx, input_buffer
+    mov edx, [file_size]
     int 0x80
 
     mov eax, 6
@@ -90,22 +152,35 @@ read_file:
 
 write_file:
     mov eax, 5
-    mov ebx, decr
+    mov ebx, output_file
     mov ecx, 0101h
     mov edx, 0666h
     int 0x80
+    test eax, eax
+    js open_error
+
     mov [file_descriptor], eax
 
     mov eax, 4
     mov ebx, [file_descriptor]
-    mov ecx, buffer
-    mov edx, 16
+    mov ecx, input_buffer
+    mov edx, [file_size]
     int 0x80
 
     mov eax, 6
     mov ebx, [file_descriptor]
     int 0x80
+
+    mov eax, 1
+    xor ebx, ebx
+    int 0x80
     ret
+
+open_error:
+    PRINTM debug_err, debug_l
+    mov eax, 1
+    mov ebx, 1
+    int 0x80
 
 scanf:
     mov eax, 3
@@ -144,4 +219,49 @@ scanf:
 
     _negate:
         neg eax    
+        ret
+printf:
+    test eax, eax
+    jge _store_number
+    mov byte [input_buffer], '-'
+    neg eax
+    mov esi, input_buffer
+    inc esi
+    jmp _convert_number
+
+    _store_number:
+        mov esi, input_buffer
+
+    _convert_number:
+        xor ecx, ecx
+        mov ebx, 10
+
+    _convert_loop:
+        xor edx, edx
+        div ebx
+        add dl, '0'
+        push dx
+        inc ecx
+        test eax, eax
+        jnz _convert_loop
+
+    _print_digits:
+        test ecx, ecx
+        jz _done_printing
+        pop dx
+        mov [esi], dl
+        inc esi
+        dec ecx
+        jmp _print_digits
+
+    _done_printing:
+        mov byte [esi], ' '
+        inc esi
+
+        mov eax, 4
+        mov ebx, 1
+        mov ecx, input_buffer
+        mov edx, esi
+        sub edx, input_buffer
+        int 0x80
         ret

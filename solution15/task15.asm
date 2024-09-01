@@ -26,10 +26,9 @@ section .bss
     output_file resb 32
     buffer_write resb 1
     input_buffer resb 1
-    result_array    resd 1
+    result_array resd 1
     result_array_size resd 1
     old_array_size resd 1
-
 
 section .text
     global _start
@@ -45,8 +44,8 @@ _start:
     mov al, [key]
     sub al, '0'
     mov [key], al
+
     PRINTM input_path, input_path_l
-    ;solution15/input
     mov eax, 3
     mov ebx, 2
     mov ecx, input_file
@@ -74,9 +73,9 @@ _start:
     mov edi, buffer_write
     mov ecx, 256
     call crypt
-    
+
 exit:
-    PRINTM state, 8
+    PRINTM state, 7
     mov eax, 1
     xor ebx, ebx
     int 0x80
@@ -85,35 +84,58 @@ print_array:
     mov esi, [result_array]
     mov ecx, [result_array_size]
     
-    _print_loop:
-        test ecx, ecx
-        jz _leave
+_print_loop:
+    test ecx, ecx
+    jz _leave
         
-        mov eax, [esi]
+    mov eax, [esi]
         
-        push ecx
-        push esi
-        call printf
-        pop esi
-        pop ecx
+    push ecx
+    push esi
+    call printf
+    pop esi
+    pop ecx
 
-        add esi, 4
-        dec ecx
-        jmp _print_loop
+    add esi, 4
+    dec ecx
+    jmp _print_loop
 
-        _leave:
-            ret
+_leave:
+    ret
 
 crypt:
-    crypt_loop:
-        lodsb
-        test al, al
-        jz _done_crypt
-        xor al, [key]
-        stosb
-        loop crypt_loop
-    _done_crypt:
-        ret
+    mov edx, ecx
+    shr edx, 2
+    jz crypt_tail
+
+crypt_unroll:
+    lodsb
+    xor al, [key]
+    stosb
+    lodsb
+    xor al, [key]
+    stosb
+    lodsb
+    xor al, [key]
+    stosb
+    lodsb
+    xor al, [key]
+    stosb
+    dec edx
+    jnz crypt_unroll
+
+crypt_tail:
+    and ecx, 3
+    jz _done_crypt
+
+crypt_tail_loop:
+    lodsb
+    xor al, [key]
+    stosb
+    loop crypt_tail_loop
+
+_done_crypt:
+    ret
 
 read_file:
     mov eax, 5
@@ -200,26 +222,27 @@ scanf:
     inc esi
     mov edi, -1
 
-    _convert_char:
-        movzx edx, byte [esi]
-        cmp edx, 0x0A
-        je _done
-        imul eax, 10
-        sub edx, '0'
-        add eax, edx
-        inc esi
-        inc ecx
-        jmp _convert_char
+_convert_char:
+    movzx edx, byte [esi]
+    cmp edx, 0x0A
+    je _done
+    imul eax, 10
+    sub edx, '0'
+    add eax, edx
+    inc esi
+    inc ecx
+    jmp _convert_char
 
-    _done:
-        test edi, edi
-        jnz _negate
-        xor esi, esi
-        ret
+_done:
+    test edi, edi
+    jnz _negate
+    xor esi, esi
+    ret
 
-    _negate:
-        neg eax    
-        ret
+_negate:
+    neg eax    
+    ret
+
 printf:
     test eax, eax
     jge _store_number
@@ -229,39 +252,39 @@ printf:
     inc esi
     jmp _convert_number
 
-    _store_number:
-        mov esi, input_buffer
+_store_number:
+    mov esi, input_buffer
 
-    _convert_number:
-        xor ecx, ecx
-        mov ebx, 10
+_convert_number:
+    xor ecx, ecx
+    mov ebx, 10
 
-    _convert_loop:
-        xor edx, edx
-        div ebx
-        add dl, '0'
-        push dx
-        inc ecx
-        test eax, eax
-        jnz _convert_loop
+_convert_loop:
+    xor edx, edx
+    div ebx
+    add dl, '0'
+    push dx
+    inc ecx
+    test eax, eax
+    jnz _convert_loop
 
-    _print_digits:
-        test ecx, ecx
-        jz _done_printing
-        pop dx
-        mov [esi], dl
-        inc esi
-        dec ecx
-        jmp _print_digits
+_print_digits:
+    test ecx, ecx
+    jz _done_printing
+    pop dx
+    mov [esi], dl
+    inc esi
+    dec ecx
+    jmp _print_digits
 
-    _done_printing:
-        mov byte [esi], ' '
-        inc esi
+_done_printing:
+    mov byte [esi], ' '
+    inc esi
 
-        mov eax, 4
-        mov ebx, 1
-        mov ecx, input_buffer
-        mov edx, esi
-        sub edx, input_buffer
-        int 0x80
-        ret
+    mov eax, 4
+    mov ebx, 1
+    mov ecx, input_buffer
+    mov edx, esi
+    sub edx, input_buffer
+    int 0x80
+    ret
